@@ -1,81 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Markerless AR Cube</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
   <style>
-    body, html { margin: 0; padding: 0; overflow: hidden; }
+    body, html { margin:0; padding:0; overflow:hidden; }
     #instructions {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.6);
-      color: white;
-      padding: 10px 20px;
-      font-family: sans-serif;
-      border-radius: 8px;
-      z-index: 10;
+      position:absolute; top:10px; left:50%;
+      transform:translateX(-50%);
+      background:rgba(0,0,0,0.6);
+      color:white; padding:10px 20px; border-radius:8px;
+      font-family:sans-serif; z-index:10;
     }
   </style>
 </head>
 <body>
-  <div id="instructions">Tap anywhere to place the cube</div>
+<div id="instructions">Tap to place cube</div>
 
-  <a-scene 
-    vr-mode-ui="enabled: false" 
-    xrweb="requiredFeatures: hit-test; optionalFeatures: dom-overlay" 
-    embedded 
-    arjs="sourceType: webcam; debugUIEnabled: false"
-    renderer="colorManagement: true; foveationLevel: 2;">
-    
-    <!-- Camera with AR hit testing -->
-    <a-entity camera look-controls 
-              id="camera"
-              position="0 1.6 0">
-    </a-entity>
+<a-scene 
+  xrweb="requiredFeatures: hit-test; optionalFeatures: dom-overlay" 
+  embedded 
+  renderer="colorManagement: true; foveationLevel: 2"
+  arjs="trackingMethod: best; debugUIEnabled: false">
 
-    <!-- Cube placeholder -->
-    <a-box id="cube" color="#ff0000" depth="0.3" height="0.3" width="0.3" visible="false"></a-box>
+  <a-entity id="camera" camera look-controls position="0 1.6 0"></a-entity>
 
-  </a-scene>
+  <a-box id="cube" color="#ff0000" depth="0.3" height="0.3" width="0.3" visible="false"></a-box>
 
-  <script>
-    const scene = document.querySelector('a-scene');
-    const cube = document.getElementById('cube');
-    let hitTestSource = null;
-    let localReferenceSpace = null;
+</a-scene>
 
-    scene.addEventListener('enter-vr', async () => {
-      const xrSession = scene.renderer.xr.getSession();
-      if (!xrSession) return;
+<script>
+const scene = document.querySelector('a-scene');
+const cube = document.getElementById('cube');
+let hitTestSource = null;
+let localSpace = null;
 
-      // Request hit test source for real-world surfaces
-      const viewerRefSpace = await xrSession.requestReferenceSpace('viewer');
-      hitTestSource = await xrSession.requestHitTestSource({ space: viewerRefSpace });
-      localReferenceSpace = await xrSession.requestReferenceSpace('local');
-    });
+scene.addEventListener('enter-vr', async () => {
+  const xrSession = scene.renderer.xr.getSession();
+  if (!xrSession) return;
 
-    // Listen for screen tap
-    window.addEventListener('touchstart', async (event) => {
-      if (!hitTestSource || !localReferenceSpace) return;
-      const xrFrame = scene.renderer.xr.getFrame();
-      if (!xrFrame) return;
+  // Request reference spaces
+  const viewerSpace = await xrSession.requestReferenceSpace('viewer');
+  hitTestSource = await xrSession.requestHitTestSource({ space: viewerSpace });
+  localSpace = await xrSession.requestReferenceSpace('local-floor');
 
-      const hitTestResults = xrFrame.getHitTestResults(hitTestSource);
-      if (hitTestResults.length > 0) {
-        const hit = hitTestResults[0];
-        const pose = hit.getPose(localReferenceSpace);
+  xrSession.addEventListener('end', () => {
+    hitTestSource = null;
+    localSpace = null;
+  });
+});
 
-        // Place the cube at real-world location
-        cube.object3D.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
-        cube.object3D.quaternion.set(pose.transform.orientation.x, pose.transform.orientation.y, pose.transform.orientation.z, pose.transform.orientation.w);
-        cube.setAttribute('visible', 'true');
-      }
-    });
-  </script>
+// Tap to place cube
+window.addEventListener('touchstart', async () => {
+  if (!hitTestSource || !localSpace) return;
+  const xrFrame = scene.renderer.xr.getFrame();
+  if (!xrFrame) return;
+
+  const hitTestResults = xrFrame.getHitTestResults(hitTestSource);
+  if (hitTestResults.length > 0) {
+    const hit = hitTestResults[0];
+    const pose = hit.getPose(localSpace);
+
+    cube.object3D.position.set(
+      pose.transform.position.x,
+      pose.transform.position.y,
+      pose.transform.position.z
+    );
+
+    cube.object3D.quaternion.set(
+      pose.transform.orientation.x,
+      pose.transform.orientation.y,
+      pose.transform.orientation.z,
+      pose.transform.orientation.w
+    );
+
+    cube.setAttribute('visible', 'true');
+  }
+});
+</script>
 </body>
 </html>
+
