@@ -1,140 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Markerless AR - Phase 1</title>
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script>
-        AFRAME.registerComponent('ar-hit-test', {
-            init: function () {
-                this.reticle = document.querySelector('#reticle');
-                this.scene = document.querySelector('a-scene');
-                this.isVisible = false;
-
-                // Handle the "tap" (select) event
-                this.scene.addEventListener('enter-vr', () => {
-                    const session = this.scene.renderer.xr.getSession();
-                    session.addEventListener('select', () => {
-                        if (this.isVisible) {
-                            this.spawnCube();
-                        }
-                    });
-                });
-            },
-            
-            tick: function () {
-                // This logic runs every frame to position the reticle
-                const scene = this.el.sceneEl;
-                if (!scene.is('ar-mode')) return;
-
-                const frame = scene.renderer.xr.getFrame();
-                const session = scene.renderer.xr.getSession();
-                const viewerSpace = scene.renderer.xr.getReferenceSpace();
-
-                if (!session || !frame || !viewerSpace) return;
-
-                const hitTestSource = session.requestHitTestSource({ space: viewerSpace });
-                
-                // Note: In a full production app, we cache the hitTestSource. 
-                // For this Phase 1 demo, we rely on A-Frame's built-in hit-test handling usually,
-                // but here is the logic to visual the reticle:
-                
-                // Actually, A-Frame has a built-in 'ar-hit-test' system. 
-                // Let's use the simplest approach: A-Frame's "ar-hit-test" feature automatically 
-                // positions objects with the "ar-hit-test-target" attribute.
-                
-                // However, to satisfy "Tap to place", we will use a visual reticle that updates 
-                // and a separate logic to place the cube.
-            },
-
-            spawnCube: function () {
-                // Create the cube
-                const cube = document.createElement('a-box');
-                
-                // Get position/rotation from the reticle
-                const position = this.reticle.getAttribute('position');
-                const rotation = this.reticle.getAttribute('rotation');
-
-                // Set attributes
-                cube.setAttribute('position', position);
-                cube.setAttribute('rotation', rotation);
-                cube.setAttribute('scale', '0.2 0.2 0.2'); // 20cm cube
-                cube.setAttribute('color', '#00E676'); // Matrix Green
-                cube.setAttribute('material', 'roughness: 0.5; metalness: 0.5');
-                
-                // Animation (pop in effect)
-                cube.setAttribute('animation', 'property: scale; from: 0 0 0; to: 0.2 0.2 0.2; dur: 400; easing: easeOutElastic');
-
-                // Add to scene
-                this.scene.appendChild(cube);
-            }
-        });
-
-        // Simple component to make the reticle follow the real world surface
-        AFRAME.registerComponent('reticle-mover', {
-            init: function () {
-                this.el.sceneEl.addEventListener('ar-hit-test-start', () => {
-                    // Logic when scanning starts
-                });
-                
-                this.el.sceneEl.addEventListener('ar-hit-test-achieved', (evt) => {
-                    // When the camera finds a surface, show the reticle
-                    const reticle = document.querySelector('#reticle');
-                    const hitTestComponent = document.querySelector('[ar-hit-test]').components['ar-hit-test'];
-                    
-                    if (evt.detail.matrix) {
-                        reticle.object3D.visible = true;
-                        reticle.object3D.position.setFromMatrixPosition(evt.detail.matrix);
-                        // Make reticle lie flat
-                        reticle.object3D.quaternion.setFromRotationMatrix(evt.detail.matrix);
-                        
-                        hitTestComponent.isVisible = true;
-                    }
-                });
-            }
-        });
-    </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Markerless AR Cube</title>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+  <style>
+    body, html { margin: 0; padding: 0; overflow: hidden; }
+    #instructions {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 10px 20px;
+      font-family: sans-serif;
+      border-radius: 8px;
+      z-index: 10;
+    }
+  </style>
 </head>
-<body style="margin: 0; overflow: hidden;">
+<body>
+  <div id="instructions">Tap anywhere to place the cube</div>
 
-    <a-scene 
-        webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #overlay"
-        ar-hit-test="target: #reticle; type: map"
-        renderer="colorManagement: true; physicallyCorrectLights: true"
-        vr-mode-ui="enabled: false">
+  <a-scene 
+    vr-mode-ui="enabled: false" 
+    xrweb="requiredFeatures: hit-test; optionalFeatures: dom-overlay" 
+    embedded 
+    arjs="sourceType: webcam; debugUIEnabled: false"
+    renderer="colorManagement: true; foveationLevel: 2;">
+    
+    <!-- Camera with AR hit testing -->
+    <a-entity camera look-controls 
+              id="camera"
+              position="0 1.6 0">
+    </a-entity>
 
-        <a-light type="directional" intensity="1" position="-1 2 1"></a-light>
-        <a-light type="ambient" intensity="0.5"></a-light>
+    <!-- Cube placeholder -->
+    <a-box id="cube" color="#ff0000" depth="0.3" height="0.3" width="0.3" visible="false"></a-box>
 
-        <a-ring id="reticle" 
-                color="white" 
-                radius-inner="0.05" 
-                radius-outer="0.06" 
-                rotation="-90 0 0"
-                visible="false">
-        </a-ring>
+  </a-scene>
 
-        <div id="overlay" style="position: absolute; bottom: 20px; left: 0; width: 100%; text-align: center; z-index: 10; pointer-events: none;">
-            <button id="ar-button" style="pointer-events: auto; padding: 12px 24px; font-size: 18px; background: white; border: none; border-radius: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
-                START AR
-            </button>
-            <p style="color: white; text-shadow: 1px 1px 2px black; font-family: sans-serif; margin-top: 10px;">
-                Scan floor &bull; Tap to place
-            </p>
-        </div>
+  <script>
+    const scene = document.querySelector('a-scene');
+    const cube = document.getElementById('cube');
+    let hitTestSource = null;
+    let localReferenceSpace = null;
 
-    </a-scene>
+    scene.addEventListener('enter-vr', async () => {
+      const xrSession = scene.renderer.xr.getSession();
+      if (!xrSession) return;
 
-    <script>
-        // Logic to handle the "Start AR" button
-        const scene = document.querySelector('a-scene');
-        const btn = document.querySelector('#ar-button');
+      // Request hit test source for real-world surfaces
+      const viewerRefSpace = await xrSession.requestReferenceSpace('viewer');
+      hitTestSource = await xrSession.requestHitTestSource({ space: viewerRefSpace });
+      localReferenceSpace = await xrSession.requestReferenceSpace('local');
+    });
 
-        btn.addEventListener('click', () => {
-            scene.enterVR(); // In WebXR, "VR" handles AR too
-            btn.style.display = 'none'; // Hide button after click
-        });
-    </script>
+    // Listen for screen tap
+    window.addEventListener('touchstart', async (event) => {
+      if (!hitTestSource || !localReferenceSpace) return;
+      const xrFrame = scene.renderer.xr.getFrame();
+      if (!xrFrame) return;
+
+      const hitTestResults = xrFrame.getHitTestResults(hitTestSource);
+      if (hitTestResults.length > 0) {
+        const hit = hitTestResults[0];
+        const pose = hit.getPose(localReferenceSpace);
+
+        // Place the cube at real-world location
+        cube.object3D.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+        cube.object3D.quaternion.set(pose.transform.orientation.x, pose.transform.orientation.y, pose.transform.orientation.z, pose.transform.orientation.w);
+        cube.setAttribute('visible', 'true');
+      }
+    });
+  </script>
 </body>
 </html>
